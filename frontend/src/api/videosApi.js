@@ -1,81 +1,99 @@
-import VIDEOS from '@/data/videos'
-import { delay, shuffle } from '@/utils'
+import axios from 'axios'
 
+const BASE_URL = 'http://localhost:5000/api/youtube'
 const ITEMS_PER_PAGE = 12
 
 /**
- * Fetches a paginated list of all videos
- * @param {number} page - 1-indexed page number
- * @param {number} limit - items per page
+ * Fetches a paginated list of all videos (Popular Feed)
  */
-export async function getVideos(page = 1, limit = ITEMS_PER_PAGE) {
-    await delay()
-    const start = (page - 1) * limit
-    const items = VIDEOS.slice(start, start + limit)
+export async function getVideos(page = 1, limit = ITEMS_PER_PAGE, pageToken = '', signal) {
+    const response = await axios.get(`${BASE_URL}/feed`, {
+        params: { limit, pageToken },
+        signal
+    })
+
     return {
-        data: items,
-        page,
-        limit,
-        total: VIDEOS.length,
-        hasMore: start + limit < VIDEOS.length,
+        data: response.data.items,
+        nextPageToken: response.data.nextPageToken,
+        total: response.data.totalResults,
+        hasMore: !!response.data.nextPageToken,
     }
 }
 
 /**
  * Gets a randomised feed page (for the home feed)
- * Shuffles the pool and paginates
+ * In YouTube API, this is usually just the most popular chart
  */
-export async function getRandomFeed(page = 1, limit = ITEMS_PER_PAGE) {
-    await delay()
-    // Seed the shuffle with the page number so successive calls give different results
-    const basePool = [...VIDEOS, ...VIDEOS] // double the pool so we have > 12 items per page
-    const shuffled = shuffle(basePool)
-    const start = (page - 1) * limit
-    const items = shuffled.slice(start, start + limit).map((v, i) => ({
-        ...v,
-        // Give each card a unique id within the page to avoid React key collisions
-        _uid: `${v.id}-${page}-${i}`,
-    }))
-
-    return {
-        data: items,
-        page,
-        limit,
-        total: basePool.length,
-        hasMore: start + limit < basePool.length,
-    }
+export async function getRandomFeed(page = 1, limit = ITEMS_PER_PAGE, pageToken = '') {
+    return getVideos(page, limit, pageToken)
 }
 
 /**
  * Fetch a single video by id
  */
 export async function getVideoById(id) {
-    await delay()
-    const video = VIDEOS.find(v => v.id === String(id))
-    if (!video) throw new Error(`Video ${id} not found`)
-    return { data: video }
+    if (id.length < 5) {
+        // Fallback for dummy IDs if they still exist in some data structures
+        return { data: null }
+    }
+    const response = await axios.get(`${BASE_URL}/video/${id}`)
+    return { data: response.data }
 }
 
 /**
- * Get related videos (excludes current video, randomised)
+ * Get related videos
  */
 export async function getRelatedVideos(id, limit = 10) {
-    await delay(200, 400)
-    const others = VIDEOS.filter(v => v.id !== String(id))
-    const shuffled = shuffle(others)
-    return { data: shuffled.slice(0, limit) }
+    const response = await axios.get(`${BASE_URL}/video/${id}/related`)
+    return { data: response.data.items }
 }
 
 /**
- * Search videos by title / tag / channel
+ * Search videos by query
  */
-export async function searchVideos(query = '', limit = 20) {
-    await delay()
-    const q = query.toLowerCase().trim()
-    const results = VIDEOS.filter(v =>
-        v.title.toLowerCase().includes(q) ||
-        v.channel.toLowerCase().includes(q) ||
-        (v.tags || []).some(t => t.toLowerCase().includes(q))
-    )
-    return { data: results.slice(0, limit), total: results.length }
+export async function searchVideos(query = '', limit = 20, pageToken = '', signal) {
+    if (!query) return { data: [], total: 0 }
+
+    const response = await axios.get(`${BASE_URL}/search`, {
+        params: { q: query, limit, pageToken },
+        signal
+    })
+
+    return {
+        data: response.data.items,
+        nextPageToken: response.data.nextPageToken,
+        total: response.data.totalResults,
+        hasMore: !!response.data.nextPageToken
+    }
 }
+/**
+ * Fetch latest videos from a list of channel IDs
+ */
+export async function getVideosByChannels(channelIds, pageToken = '') {
+    if (!channelIds || channelIds.length === 0) return { data: [] }
+
+    // Join IDs with a comma for the query parameter
+    const idsString = channelIds.join(',');
+
+    const response = await axios.get(`${BASE_URL}/subscriptions/videos`, {
+        params: { channelIds: idsString, pageToken }
+    })
+
+    return {
+        data: response.data.items,
+        nextPageToken: response.data.nextPageToken
+    }
+}
+
+/**
+ * Fetch channel details for a list of IDs
+ */
+export async function getChannelsDetails(ids) {
+    if (!ids || ids.length === 0) return { data: [] }
+    const idsString = ids.join(',')
+    const response = await axios.get(`${BASE_URL}/channels`, {
+        params: { ids: idsString }
+    })
+    return { data: response.data.items }
+}
+

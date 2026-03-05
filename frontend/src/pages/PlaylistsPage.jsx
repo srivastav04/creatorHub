@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUser } from '@clerk/clerk-react'
 import { getPlaylists, createPlaylist, deletePlaylist } from '@/api/playlistApi'
 import { VideoCardSkeleton, Skeleton } from '@/components/Skeleton'
 import { ListVideo, Plus, Trash2, X, Loader2, Music2 } from 'lucide-react'
@@ -9,6 +10,7 @@ import { formatTimeAgo } from '@/utils'
 
 export function PlaylistsPage() {
     const queryClient = useQueryClient()
+    const { user } = useUser()
     const [showModal, setShowModal] = useState(false)
     const [name, setName] = useState('')
 
@@ -18,7 +20,7 @@ export function PlaylistsPage() {
     })
 
     const createMutation = useMutation({
-        mutationFn: createPlaylist,
+        mutationFn: (name) => createPlaylist(name, '', user?.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['playlists'] })
             setShowModal(false)
@@ -27,14 +29,14 @@ export function PlaylistsPage() {
     })
 
     const deleteMutation = useMutation({
-        mutationFn: deletePlaylist,
+        mutationFn: (playlistId) => deletePlaylist(playlistId, user?.id),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['playlists'] }),
     })
 
     const playlists = data?.data || []
 
     return (
-        <div className="px-4 py-6 lg:px-8 max-w-5xl">
+        <div className="px-4 py-6 lg:px-8 max-w-[1800px]">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">

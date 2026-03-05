@@ -1,11 +1,20 @@
-import { useState } from 'react'
-import { Outlet } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Outlet, useLocation } from 'react-router-dom'
 import { Topbar } from '@/components/Topbar'
 import { Sidebar } from '@/components/Sidebar'
 import { cn } from '@/utils'
 
 export function AppLayout() {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+    // Start closed on mobile, open on desktop
+    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 1024)
+    const location = useLocation()
+
+    // Close sidebar on route change (for mobile)
+    useEffect(() => {
+        if (window.innerWidth < 1024) {
+            setIsSidebarOpen(false)
+        }
+    }, [location.pathname])
 
     const toggleSidebar = () => setIsSidebarOpen(prev => !prev)
 

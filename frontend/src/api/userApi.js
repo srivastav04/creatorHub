@@ -1,6 +1,7 @@
 import VIDEOS from '@/data/videos'
 import YOUTUBERS from '@/data/youtubers'
 import { delay, generateId } from '@/utils'
+import axios from 'axios'
 
 // ----- localStorage helpers -----
 function getStore(key, defaultValue) {
@@ -27,36 +28,64 @@ const KEYS = {
     setup: 'yt_setup_complete',
 }
 
+const BASE_URL = 'http://localhost:5000/api/user'
+
+// ----- Sync Helper -----
+async function syncToBackend(clerkId) {
+    try {
+        const history = getStore(KEYS.history, [])
+        const likedVideos = getStore(KEYS.liked, [])
+        const playlists = getStore('yt_playlists', [])
+        const subscriptions = getStore(KEYS.subscriptions, [])
+
+        await axios.post(`${BASE_URL}/sync`, {
+            history: history.slice(0, 10),
+            likedVideos,
+            playlists,
+            subscriptions
+        }, {
+            headers: { 'x-clerk-id': clerkId }
+        })
+    } catch (error) {
+        console.error('Failed to sync with backend:', error)
+    }
+}
+
 // ----- Watch History -----
 
 export async function getWatchHistory() {
-    await delay()
+    //await delay()
     const history = getStore(KEYS.history, [])
     return { data: history }
 }
 
-export async function addToWatchHistory(video) {
-    await delay(100, 200)
+export async function addToWatchHistory(video, clerkId) {
+    //await delay(100, 200)
     const history = getStore(KEYS.history, [])
     // Remove if already exists (move‑to‑top)
     const filtered = history.filter(h => h.id !== video.id)
     const entry = { ...video, watchedAt: new Date().toISOString() }
     const updated = [entry, ...filtered].slice(0, 200) // max 200 entries
     setStore(KEYS.history, updated)
+
+    if (clerkId) syncToBackend(clerkId)
+
     return { data: updated }
 }
 
-export async function clearWatchHistory() {
+export async function clearWatchHistory(clerkId) {
     await delay(100, 200)
     setStore(KEYS.history, [])
+    if (clerkId) syncToBackend(clerkId)
     return { data: [] }
 }
 
-export async function removeFromWatchHistory(videoId) {
+export async function removeFromWatchHistory(videoId, clerkId) {
     await delay(100, 200)
     const history = getStore(KEYS.history, [])
     const updated = history.filter(h => h.id !== videoId)
     setStore(KEYS.history, updated)
+    if (clerkId) syncToBackend(clerkId)
     return { data: updated }
 }
 
@@ -68,7 +97,7 @@ export async function getLikedVideos() {
     return { data: liked }
 }
 
-export async function toggleLike(video) {
+export async function toggleLike(video, clerkId) {
     await delay(100, 200)
     const liked = getStore(KEYS.liked, [])
     const exists = liked.some(v => v.id === video.id)
@@ -79,6 +108,9 @@ export async function toggleLike(video) {
         updated = [{ ...video, likedAt: new Date().toISOString() }, ...liked]
     }
     setStore(KEYS.liked, updated)
+
+    if (clerkId) syncToBackend(clerkId)
+
     return { data: updated, isLiked: !exists }
 }
 
@@ -91,27 +123,55 @@ export async function isVideoLiked(videoId) {
 // ----- Subscriptions -----
 
 export async function getSubscriptions() {
-    await delay()
     const subs = getStore(KEYS.subscriptions, [])
-    // Hydrate with full YouTuber data
-    const hydrated = subs.map(id => YOUTUBERS.find(y => y.id === id)).filter(Boolean)
-    return { data: hydrated }
+    if (subs.length === 0) return { data: [] }
+
+    try {
+        // Fetch real data from YouTube API for these Ids
+        const response = await axios.get(`http://localhost:5000/api/youtube/channels`, {
+            params: { ids: subs.join(',') }
+        })
+        return { data: response.data.items }
+    } catch (err) {
+        console.error("Hydration error in getSubscriptions:", err);
+        // Fallback or empty
+        return { data: [] }
+    }
 }
 
-export async function saveSubscriptions(youtuberIds) {
-    await delay(200, 400)
-    setStore(KEYS.subscriptions, youtuberIds)
+
+export async function saveSubscriptions({ clerkId, subscriptions }) {
+    // API Call to Backend
+    const response = await axios.post(`${BASE_URL}/setup`, {
+        clerkId,
+        subscriptions
+    })
+
+    // Local state fallback update
+    setStore(KEYS.subscriptions, subscriptions)
     localStorage.setItem(KEYS.setup, 'true')
-    return { data: youtuberIds }
+
+    return response.data
 }
 
-export async function toggleSubscription(youtuberId) {
+export async function toggleSubscription(youtuberId, clerkId) {
     await delay(100, 200)
     const subs = getStore(KEYS.subscriptions, [])
+    console.log("current list", subs);
     const exists = subs.includes(youtuberId)
     const updated = exists ? subs.filter(id => id !== youtuberId) : [...subs, youtuberId]
+    console.log("updated list", updated);
+
     setStore(KEYS.subscriptions, updated)
+
+    if (clerkId) syncToBackend(clerkId)
+
     return { data: updated, isSubscribed: !exists }
+}
+
+export function isSubscribed(youtuberId) {
+    const subs = getStore(KEYS.subscriptions, [])
+    return subs.includes(youtuberId)
 }
 
 // ----- Setup -----
@@ -124,11 +184,37 @@ export function markSetupComplete() {
     localStorage.setItem(KEYS.setup, 'true')
 }
 
+export async function verifyUser(clerkId) {
+    try {
+        const response = await axios.get(`${BASE_URL}/verify`, {
+            headers: {
+                'x-clerk-id': clerkId
+            }
+        });
+
+        if (response.data.exists) {
+            markSetupComplete();
+            // Hydrate local storage with DB data
+            if (response.data.history) setStore(KEYS.history, response.data.history);
+            if (response.data.likedVideos) setStore(KEYS.liked, response.data.likedVideos);
+            if (response.data.playlists) setStore('yt_playlists', response.data.playlists);
+            if (response.data.subscriptions) setStore(KEYS.subscriptions, response.data.subscriptions);
+        } else {
+            localStorage.removeItem(KEYS.setup);
+        }
+
+        return response.data;
+    } catch (error) {
+        console.error('Error verifying user:', error);
+        throw error;
+    }
+}
+
 // ----- Subscription Feed -----
 
 export async function getSubscriptionFeed() {
     await delay()
     const subs = getStore(KEYS.subscriptions, [])
-    const feed = VIDEOS.filter(v => subs.includes(v.channelId))
-    return { data: feed }
+    return { data: subs }
 }
+

@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { SignedIn, SignedOut, SignIn } from '@clerk/clerk-react'
+import { SignedIn, SignedOut, SignIn, useUser } from '@clerk/clerk-react'
+import { Loader2 } from 'lucide-react'
 
 import { AppLayout } from '@/layouts/AppLayout'
 import { HomePage } from '@/pages/HomePage'
@@ -10,33 +12,68 @@ import { PlaylistsPage } from '@/pages/PlaylistsPage'
 import { PlaylistDetailPage } from '@/pages/PlaylistDetailPage'
 import { LikedPage } from '@/pages/LikedPage'
 import { SubscriptionsPage } from '@/pages/SubscriptionsPage'
+import { SearchPage } from '@/pages/SearchPage'
 
-import { isSetupComplete } from '@/api/userApi'
+import { isSetupComplete, verifyUser } from '@/api/userApi'
 
 // Protects routes that require authentication
 function AuthGuard({ children }) {
-    // return (
-    //     <>
-    //         <SignedIn>{children}</SignedIn>
-    //         <SignedOut>
-    //             <Navigate to="/sign-in" replace />
-    //         </SignedOut>
-    //     </>
-    // )
-    return children
+    const { user, isLoaded } = useUser();
+    const [isVerifying, setIsVerifying] = useState(true);
+
+    useEffect(() => {
+        if (isLoaded && user) {
+            verifyUser(user.id).finally(() => setIsVerifying(false));
+        } else if (isLoaded && !user) {
+            setIsVerifying(false);
+        }
+    }, [isLoaded, user]);
+
+    if (!isLoaded || (user && isVerifying)) {
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+        );
+    }
+
+    return (
+        <>
+            <SignedIn>{children}</SignedIn>
+            <SignedOut>
+                <Navigate to="/sign-in" replace />
+            </SignedOut>
+        </>
+    )
+
 }
 
 // Enforces the Setup Page flow
 function SetupGuard({ children }) {
-    // const complete = isSetupComplete()
-    // if (!complete) {
-    //     return <Navigate to="/setup" replace />
-    // }
+    const complete = isSetupComplete()
+    if (!complete) {
+        return <Navigate to="/setup" replace />
+    }
     return children
 }
 
 // Redirects logged-in users away from /sign-in and /setup (if already done)
 function RedirectIfAuth({ to }) {
+    const { user, isLoaded } = useUser();
+    const [isVerifying, setIsVerifying] = useState(true);
+
+    useEffect(() => {
+        if (isLoaded && user) {
+            verifyUser(user.id).finally(() => setIsVerifying(false));
+        } else if (isLoaded && !user) {
+            setIsVerifying(false);
+        }
+    }, [isLoaded, user]);
+
+    if (!isLoaded || (user && isVerifying)) {
+        return null;
+    }
+
     const complete = isSetupComplete()
     return (
         <SignedIn>
@@ -81,6 +118,7 @@ export function AppRoutes() {
                 }
             >
                 <Route path="/home" element={<HomePage />} />
+                <Route path="/search" element={<SearchPage />} />
                 <Route path="/watch/:id" element={<WatchPage />} />
                 <Route path="/history" element={<HistoryPage />} />
                 <Route path="/playlists" element={<PlaylistsPage />} />

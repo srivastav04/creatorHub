@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUser } from '@clerk/clerk-react'
 import { getWatchHistory, clearWatchHistory, removeFromWatchHistory } from '@/api/userApi'
 import { VideoCard } from '@/components/VideoCard'
 import { VideoCardSkeleton } from '@/components/Skeleton'
@@ -7,6 +8,7 @@ import { History, Trash2, X } from 'lucide-react'
 
 export function HistoryPage() {
     const queryClient = useQueryClient()
+    const { user } = useUser()
 
     const { data, isLoading } = useQuery({
         queryKey: ['history'],
@@ -14,20 +16,22 @@ export function HistoryPage() {
     })
 
     const clearMutation = useMutation({
-        mutationFn: clearWatchHistory,
+        mutationFn: () => clearWatchHistory(user?.id),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history'] }),
     })
 
     const removeMutation = useMutation({
-        mutationFn: removeFromWatchHistory,
+        mutationFn: (videoId) => removeFromWatchHistory(videoId, user?.id),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ['history'] }),
     })
 
     const history = data?.data || []
     const groups = groupByDate(history, 'watchedAt')
+    console.log(history);
+
 
     return (
-        <div className="px-4 py-6 lg:px-8 max-w-5xl">
+        <div className="px-4 py-6 lg:px-8 max-w-[1800px]">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
  * Manages all video player state and keyboard shortcuts.
  * Returns player state and handlers to attach to a <video> element.
  */
-export function useVideoPlayer(videoRef) {
+export function useVideoPlayer(videoRef, containerRef) {
     const [isPlaying, setIsPlaying] = useState(false)
     const [isMuted, setIsMuted] = useState(false)
     const [volume, setVolume] = useState(1)
@@ -56,15 +56,26 @@ export function useVideoPlayer(videoRef) {
 
     // ---- Fullscreen ----
     const toggleFullscreen = useCallback(() => {
-        const container = videoRef.current?.closest('.video-container')
+        const container = containerRef?.current || videoRef.current?.closest('.video-container')
+        if (!container) return
+
         if (!document.fullscreenElement) {
-            container?.requestFullscreen()
-            setIsFullscreen(true)
+            container.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable fullscreen: ${err.message}`)
+            })
         } else {
             document.exitFullscreen()
-            setIsFullscreen(false)
         }
-    }, [videoRef])
+    }, [videoRef, containerRef])
+
+    // Sync fullscreen state with browser
+    useEffect(() => {
+        const onFullscreenChange = () => {
+            setIsFullscreen(!!document.fullscreenElement)
+        }
+        document.addEventListener('fullscreenchange', onFullscreenChange)
+        return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+    }, [])
 
     // ---- Theater ----
     const toggleTheater = useCallback(() => {

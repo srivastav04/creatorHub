@@ -13,7 +13,7 @@ export function LikedPage() {
     const liked = data?.data || []
 
     return (
-        <div className="px-4 py-6 lg:px-8 max-w-6xl">
+        <div className="px-4 py-6 lg:px-8 max-w-[1800px]">
             <div className="flex items-center gap-3 mb-6">
                 <ThumbsUp className="h-7 w-7 text-foreground" />
                 <h1 className="text-2xl font-bold text-foreground">Liked Videos</h1>

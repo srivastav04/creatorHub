@@ -68,32 +68,35 @@ export function Sidebar({ isOpen, onClose }) {
                 {/* Subscriptions section */}
                 {subscriptions.length > 0 && (
                     <div className={cn('mt-2 border-t border-border/50 p-2', !isOpen && 'lg:hidden')}>
-                        <p className="mb-1 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <p className="mb-2 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
                             Subscriptions
                         </p>
-                        {subscriptions.slice(0, 8).map(ytber => (
-                            <NavLink
-                                key={ytber.id}
-                                to={`/channel/${ytber.id}`}
-                                className={({ isActive }) =>
-                                    cn(
-                                        'flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-colors',
-                                        isActive
-                                            ? 'bg-accent text-foreground font-medium'
-                                            : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
-                                    )
-                                }
-                            >
-                                <img
-                                    src={ytber.avatar}
-                                    alt={ytber.name}
-                                    className="h-6 w-6 shrink-0 rounded-full object-cover"
-                                />
-                                <span className="truncate">{ytber.name}</span>
-                            </NavLink>
-                        ))}
+                        <div className="flex flex-col gap-0.5 max-h-[320px] overflow-y-auto scrollbar-thin hover:scrollbar-thumb-muted-foreground/20">
+                            {subscriptions.map(ytber => (
+                                <NavLink
+                                    key={ytber.id}
+                                    to={`/channel/${ytber.id}`}
+                                    className={({ isActive }) =>
+                                        cn(
+                                            'flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition-all duration-200',
+                                            isActive
+                                                ? 'bg-accent text-foreground font-semibold shadow-sm'
+                                                : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+                                        )
+                                    }
+                                >
+                                    <img
+                                        src={ytber.avatar}
+                                        alt={ytber.name}
+                                        className="h-6 w-6 shrink-0 rounded-full object-cover shadow-sm ring-1 ring-border/50"
+                                    />
+                                    <span className="truncate">{ytber.name}</span>
+                                </NavLink>
+                            ))}
+                        </div>
                     </div>
                 )}
+
 
                 <div className="mt-auto p-3 text-center">
                     <p className={cn('text-[10px] text-muted-foreground/50', !isOpen && 'lg:hidden')}>

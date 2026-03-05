@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUser } from '@clerk/clerk-react'
 import { getVideoById, getRelatedVideos } from '@/api/videosApi'
-import { addToWatchHistory, toggleLike, isVideoLiked } from '@/api/userApi'
+import { addToWatchHistory, toggleLike, isVideoLiked, toggleSubscription, isSubscribed } from '@/api/userApi'
 import { getPlaylists as fetchPlaylists, addToPlaylist, createPlaylist } from '@/api/playlistApi'
 import { VideoPlayer } from '@/components/VideoPlayer'
 import { VideoCardSkeleton, Skeleton } from '@/components/Skeleton'
@@ -14,12 +15,28 @@ import {
 
 export function WatchPage() {
     const { id } = useParams()
+    const { user } = useUser()
     const queryClient = useQueryClient()
     const [isTheater, setIsTheater] = useState(false)
     const [showPlaylistModal, setShowPlaylistModal] = useState(false)
     const [newPlaylistName, setNewPlaylistName] = useState('')
     const [isLiked, setIsLiked] = useState(false)
+    const [subscribed, setSubscribed] = useState(false)
     const [showDesc, setShowDesc] = useState(false)
+
+
+
+    const addHistoryMutation = useMutation({
+        mutationFn: (video) => addToWatchHistory(video, user?.id),
+
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: ['history'],
+            })
+        },
+    })
+
+
 
     const { data: videoData, isLoading: videoLoading } = useQuery({
         queryKey: ['video', id],
@@ -43,26 +60,40 @@ export function WatchPage() {
     // Track watch history
     useEffect(() => {
         if (video) {
-            addToWatchHistory(video)
+            addHistoryMutation.mutate(video)
         }
-    }, [video])
+    }, [video, user?.id])
 
-    // Load liked state
+    // Load liked and subscription state
     useEffect(() => {
         if (id) {
             isVideoLiked(id).then(r => setIsLiked(r.isLiked))
         }
-    }, [id])
+        if (video?.channelId) {
+            setSubscribed(isSubscribed(video.channelId))
+        }
+    }, [id, video?.channelId])
 
     const likeMutation = useMutation({
-        mutationFn: () => toggleLike(video),
+        mutationFn: () => toggleLike(video, user?.id),
         onSuccess: (data) => {
             setIsLiked(data.isLiked)
+            queryClient.invalidateQueries({ queryKey: ['liked_videos'] })
+        },
+    })
+
+    const subscribeMutation = useMutation({
+        mutationFn: () => toggleSubscription(video.channelId, user?.id),
+        onSuccess: (data) => {
+            setSubscribed(data.isSubscribed)
+            queryClient.invalidateQueries({ queryKey: ['subscriptions'] })
+            queryClient.invalidateQueries({ queryKey: ['subscription_feed'] })
+            queryClient.invalidateQueries({ queryKey: ['home_feed'] })
         },
     })
 
     const addToPlaylistMutation = useMutation({
-        mutationFn: (playlistId) => addToPlaylist(playlistId, video),
+        mutationFn: (playlistId) => addToPlaylist(playlistId, video, user?.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['playlists'] })
             setShowPlaylistModal(false)
@@ -70,7 +101,7 @@ export function WatchPage() {
     })
 
     const createPlaylistMutation = useMutation({
-        mutationFn: (name) => createPlaylist(name),
+        mutationFn: (name) => createPlaylist(name, '', user?.id),
         onSuccess: (newPl) => {
             addToPlaylistMutation.mutate(newPl.data.id)
         },
@@ -127,9 +158,24 @@ export function WatchPage() {
                             <p className="font-semibold text-foreground text-sm">{video.channel}</p>
                             <p className="text-xs text-muted-foreground">{video.subscribers} subscribers</p>
                         </div>
-                        <button className="ml-2 flex items-center gap-1.5 rounded-full bg-foreground px-4 py-2 text-sm font-semibold text-background transition-opacity hover:opacity-90">
-                            <Bell className="h-3.5 w-3.5" />
-                            Subscribe
+                        <button
+                            onClick={() => subscribeMutation.mutate()}
+                            disabled={subscribeMutation.isPending}
+                            className={cn(
+                                "ml-2 flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition-all active:scale-95",
+                                subscribed
+                                    ? "bg-accent text-foreground hover:bg-accent/80"
+                                    : "bg-foreground text-background hover:opacity-90"
+                            )}>
+                            {subscribed ? (
+                                <>
+                                    <Bell className="h-3.5 w-3.5" />
+                                    Subscribed
+                                </>
+                            ) : (
+                                'Subscribe'
+                            )}
+                            {subscribeMutation.isPending && <Loader2 className="ml-1 h-3 w-3 animate-spin" />}
                         </button>
                     </div>
 

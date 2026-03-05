@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useUser } from '@clerk/clerk-react'
 import { getPlaylistById, removeFromPlaylist } from '@/api/playlistApi'
 import { VideoCard } from '@/components/VideoCard'
 import { Skeleton, VideoCardSkeleton } from '@/components/Skeleton'
@@ -8,6 +9,7 @@ import { ListVideo, Trash2, ArrowLeft } from 'lucide-react'
 
 export function PlaylistDetailPage() {
     const { id } = useParams()
+    const { user } = useUser()
     const queryClient = useQueryClient()
 
     const { data, isLoading } = useQuery({
@@ -16,7 +18,7 @@ export function PlaylistDetailPage() {
     })
 
     const removeMutation = useMutation({
-        mutationFn: (videoId) => removeFromPlaylist(id, videoId),
+        mutationFn: (videoId) => removeFromPlaylist(id, videoId, user?.id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['playlist', id] })
             queryClient.invalidateQueries({ queryKey: ['playlists'] })
