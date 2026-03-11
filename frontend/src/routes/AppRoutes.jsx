@@ -90,7 +90,7 @@ export function AppRoutes() {
                 path="/sign-in/*"
                 element={
                     <div className="flex h-screen w-screen items-center justify-center bg-background">
-                        {/* <RedirectIfAuth /> */}
+                        <RedirectIfAuth />
                         <SignIn routing="path" path="/sign-in" signUpUrl="/sign-in" />
                     </div>
                 }
@@ -100,10 +100,9 @@ export function AppRoutes() {
             <Route
                 path="/setup"
                 element={
-                    // <AuthGuard>
-                    //     {isSetupComplete() ? <Navigate to="/home" replace /> : <SetupPage />}
-                    // </AuthGuard>
-                    <SetupPage />
+                    <AuthGuard>
+                        {isSetupComplete() ? <Navigate to="/home" replace /> : <SetupPage />}
+                    </AuthGuard>
                 }
             />
 

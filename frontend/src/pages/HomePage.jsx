@@ -74,7 +74,7 @@ export function HomePage() {
 
             {/* Main Content */}
             {isLoading ? (
-                <div className="grid grid-cols-1 gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
                     {Array.from({ length: 12 }).map((_, i) => <VideoCardSkeleton key={i} />)}
                 </div>
             ) : subscribedChannelIds.length === 0 ? (
@@ -93,7 +93,7 @@ export function HomePage() {
                     </Link>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-x-4 gap-y-10 sm:grid-cols-2 lg:grid-cols-3">
                     {allVideos.map((video, idx) => (
                         <VideoCard key={`${video.id}-${idx}`} video={video} />
                     ))}

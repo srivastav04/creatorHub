@@ -9,5 +9,6 @@ router.get('/video/:id', youtubeController.getVideo);
 router.get('/video/:id/related', youtubeController.getRelated);
 router.get('/subscriptions/videos', youtubeController.getSubscriptionVideos);
 router.get('/channels', youtubeController.getChannels);
+router.get('/scrape-channel', youtubeController.scrapeChannel);
 
 export default router;

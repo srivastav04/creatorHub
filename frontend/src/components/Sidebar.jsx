@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { data, NavLink, useLocation } from 'react-router-dom'
 import {
     Home, Compass, History, ListVideo, ThumbsUp,
     ChevronLeft, ChevronRight, Video
@@ -23,6 +23,8 @@ export function Sidebar({ isOpen, onClose }) {
         queryFn: getSubscriptions,
     })
     const subscriptions = subData?.data || []
+    console.log(subscriptions);
+
 
     return (
         <>

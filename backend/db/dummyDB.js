@@ -1,4 +1,5 @@
 // In-memory dummy database
-const users = [];
+export const users = [];
+export const channels = [];
 
 export default users;

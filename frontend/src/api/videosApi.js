@@ -97,3 +97,23 @@ export async function getChannelsDetails(ids) {
     return { data: response.data.items }
 }
 
+/**
+ * Scrape channel details from YouTube search
+ */
+export async function scrapeChannel(query) {
+    if (!query) return null
+    const response = await axios.get(`${BASE_URL}/scrape-channel`, {
+        params: { q: query }
+    })
+    return response.data
+}
+
+/**
+ * Fetch & cache the latest 15 videos for a single channel.
+ * Called immediately when the user clicks Subscribe on a search result.
+ */
+export async function subscribeChannel(channelId) {
+    if (!channelId) return null
+    const response = await axios.post('http://localhost:5000/api/channels/subscribe', { channelId })
+    return response.data
+}

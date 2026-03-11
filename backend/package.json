@@ -1,21 +1,40 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "app.js",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "migrate": "node scripts/migrate.js",
+    "dev:tunnel": "ngrok http 5000"
+  },
+  "nodemonConfig": {
+    "watch": [
+      ".",
+      "routes",
+      "controllers",
+      "services",
+      "db",
+      "middleware"
+    ],
+    "ext": "js,json",
+    "ignore": [
+      "node_modules",
+      "*.test.js"
+    ]
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "YouTube Hub backend – Express + PostgreSQL",
   "dependencies": {
     "axios": "^1.13.6",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "googleapis": "^171.4.0"
+    "fast-xml-parser": "^5.4.2",
+    "googleapis": "^171.4.0",
+    "pg": "^8.20.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

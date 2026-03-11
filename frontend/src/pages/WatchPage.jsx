@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useUser } from '@clerk/clerk-react'
-import { getVideoById, getRelatedVideos } from '@/api/videosApi'
+import { getVideoById } from '@/api/videosApi'
 import { addToWatchHistory, toggleLike, isVideoLiked, toggleSubscription, isSubscribed } from '@/api/userApi'
 import { getPlaylists as fetchPlaylists, addToPlaylist, createPlaylist } from '@/api/playlistApi'
 import { VideoPlayer } from '@/components/VideoPlayer'
-import { VideoCardSkeleton, Skeleton } from '@/components/Skeleton'
+import { Skeleton } from '@/components/Skeleton'
 import { formatViews, formatTimeAgo, cn } from '@/utils'
 import {
-    ThumbsUp, ThumbsDown, Share2, Download, Flag,
-    ListPlus, Bell, Check, Plus, X, Loader2
+    ThumbsUp, ThumbsDown, Share2,
+    ListPlus, Bell, Plus, X, Loader2
 } from 'lucide-react'
 
 export function WatchPage() {
@@ -43,10 +43,6 @@ export function WatchPage() {
         queryFn: () => getVideoById(id),
     })
 
-    const { data: relatedData, isLoading: relatedLoading } = useQuery({
-        queryKey: ['related', id],
-        queryFn: () => getRelatedVideos(id),
-    })
 
     const { data: playlistsData } = useQuery({
         queryKey: ['playlists'],
@@ -54,7 +50,6 @@ export function WatchPage() {
     })
 
     const video = videoData?.data
-    const related = relatedData?.data || []
     const playlists = playlistsData?.data || []
 
     // Track watch history
@@ -90,6 +85,13 @@ export function WatchPage() {
             queryClient.invalidateQueries({ queryKey: ['subscription_feed'] })
             queryClient.invalidateQueries({ queryKey: ['home_feed'] })
         },
+        onSettled: async () => {
+            // Refetch to ensure UI updates immediately
+            await Promise.all([
+                queryClient.refetchQueries({ queryKey: ['subscription_feed'] }),
+                queryClient.refetchQueries({ queryKey: ['subscriptions'] })
+            ])
+        }
     })
 
     const addToPlaylistMutation = useMutation({
@@ -109,14 +111,11 @@ export function WatchPage() {
 
     if (videoLoading) {
         return (
-            <div className="flex flex-col lg:flex-row gap-6 p-4 lg:p-6">
-                <div className="flex-1">
+            <div className="flex flex-col w-full pb-8">
+                <div className="max-w-6xl mx-auto px-4 lg:px-6 pt-4 lg:pt-6 w-full flex flex-col gap-4">
                     <Skeleton className="aspect-video w-full rounded-xl" />
-                    <Skeleton className="mt-4 h-7 w-3/4 rounded" />
-                    <Skeleton className="mt-2 h-5 w-1/2 rounded" />
-                </div>
-                <div className="w-full lg:w-96 flex flex-col gap-4">
-                    {Array.from({ length: 5 }).map((_, i) => <VideoCardSkeleton key={i} />)}
+                    <Skeleton className="h-8 w-3/4 rounded" />
+                    <Skeleton className="h-12 w-full rounded-xl" />
                 </div>
             </div>
         )
@@ -129,19 +128,26 @@ export function WatchPage() {
     )
 
     return (
-        <div className={cn(
-            'flex flex-col gap-6 p-4 lg:p-6',
-            isTheater ? 'lg:flex-col' : 'lg:flex-row'
-        )}>
-            {/* Main column */}
-            <div className={cn('flex flex-col gap-4', isTheater ? 'w-full' : 'flex-1 min-w-0')}>
-                {/* Video player */}
-                <VideoPlayer
-                    video={video}
-                    isTheater={isTheater}
-                    onTheaterToggle={() => setIsTheater(t => !t)}
-                />
+        <div className="flex flex-col w-full pb-8">
+            {/* Video Player Section */}
+            <div className={cn(
+                "w-full flex justify-center bg-black transition-all",
+                isTheater ? "" : "bg-transparent max-w-6xl mx-auto px-4 lg:px-6 pt-4 lg:pt-6"
+            )}>
+                <div className={cn(
+                    "w-full",
+                    isTheater ? "max-w-[1500px]" : ""
+                )}>
+                    <VideoPlayer
+                        video={video}
+                        isTheater={isTheater}
+                        onTheaterToggle={() => setIsTheater(t => !t)}
+                    />
+                </div>
+            </div>
 
+            {/* Video Info Section */}
+            <div className="w-full max-w-6xl mx-auto px-4 lg:px-6 flex flex-col gap-4 mt-4">
                 {/* Title */}
                 <h1 className="text-xl font-bold leading-tight text-foreground">{video.title}</h1>
 
@@ -232,40 +238,6 @@ export function WatchPage() {
                         {showDesc ? 'Show less' : 'Show more'}
                     </button>
                 </div>
-            </div>
-
-            {/* Sidebar: related videos */}
-            <div className={cn(
-                'flex flex-col gap-3',
-                isTheater ? 'hidden' : 'w-full lg:w-96 shrink-0'
-            )}>
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Up next</h3>
-                {relatedLoading
-                    ? Array.from({ length: 6 }).map((_, i) => <VideoCardSkeleton key={i} />)
-                    : related.map(v => (
-                        <Link
-                            key={v.id}
-                            to={`/watch/${v.id}`}
-                            className="group flex gap-3 hover:no-underline"
-                        >
-                            <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg bg-muted">
-                                <img
-                                    src={v.thumbnail}
-                                    alt={v.title}
-                                    className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                                    loading="lazy"
-                                />
-                            </div>
-                            <div className="flex min-w-0 flex-col gap-1">
-                                <p className="line-clamp-2 text-sm font-medium text-foreground group-hover:text-primary transition-colors">
-                                    {v.title}
-                                </p>
-                                <p className="text-xs text-muted-foreground">{v.channel}</p>
-                                <p className="text-xs text-muted-foreground">{formatViews(v.views)}</p>
-                            </div>
-                        </Link>
-                    ))
-                }
             </div>
 
             {/* Playlist modal (simple overlay) */}

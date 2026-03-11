@@ -63,7 +63,7 @@ export function Topbar({ onMenuClick, isSidebarOpen }) {
 
                     <Link to="/home" className="flex items-center gap-1.5 hover:opacity-90 transition-opacity">
                         <span className="text-base font-bold tracking-tight text-foreground hidden sm:block">
-                            YouTube
+                            Creator Hub
                         </span>
                     </Link>
                 </div>

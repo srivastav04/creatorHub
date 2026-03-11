@@ -1,92 +1,114 @@
+/**
+ * user.controller.js
+ * ──────────────────────────────────────────────────────────────────────────
+ * All controllers are now async — user.service calls hit real Postgres.
+ */
 import * as userService from '../services/user.service.js';
+import * as channelService from '../services/channel.service.js';
 import { sendDataToN8n } from '../services/webhook.service.js';
 
 
-export const setupUser = (req, res) => {
+// ─── POST /api/user/setup ──────────────────────────────────────────────────
+export const setupUser = async (req, res) => {
     try {
-        const { clerkId, subscriptions } = req.body;
+        const { clerkId, subscriptions, email } = req.body;
 
-        if (!clerkId || !subscriptions || !Array.isArray(subscriptions)) {
-            return res.status(400).json({ error: 'Valid clerkId and subscriptions array are required.' });
+        if (!clerkId || typeof clerkId !== 'string') {
+            return res.status(400).json({ error: 'clerkId (string) is required.' });
+        }
+        if (!Array.isArray(subscriptions)) {
+            return res.status(400).json({ error: 'subscriptions must be an array.' });
         }
 
-        const user = userService.saveSubscriptions(clerkId, subscriptions);
+        const user = await userService.saveSubscriptions(clerkId, subscriptions, email || null);
 
-        // Send to n8n
+        // Fetch and cache the latest 15 videos for each channel.
+        // Fire-and-forget — don't delay the response.
+        if (subscriptions.length > 0) {
+            Promise.all(
+                subscriptions.map((channelId) =>
+                    channelService.fetchAndCacheChannelVideos(channelId).catch((err) =>
+                        console.warn(`[setupUser] Failed to cache videos for ${channelId}:`, err.message)
+                    )
+                )
+            ).catch(() => { }); // suppress unhandled rejection at the outer level
+        }
+
+        // Fire-and-forget: send to n8n (don't block the response)
         sendDataToN8n({
             event: 'user_setup',
             clerkId,
+            email: email || null,
             subscriptions,
-            timestamp: new Date().toISOString()
-        }).catch(err => console.error('Failed to send user_setup to n8n:', err.message));
+            timestamp: new Date().toISOString(),
+        }).catch((err) => console.error('[n8n] user_setup event failed:', err.message));
 
-        console.log("user", user);
-
-        res.status(200).json({
-            message: 'Subscriptions saved successfully.',
-            user
-        });
-
+        return res.status(200).json({ success: true, user });
     } catch (error) {
-        console.error('Error saving subscriptions:', error);
-        res.status(500).json({ error: 'Internal server error.' });
+        console.error('[setupUser] Error:', error);
+        return res.status(500).json({ error: 'Internal server error.' });
     }
 };
 
-export const verifyUser = (req, res) => {
-    try {
-        const clerkId = req.clerkId; // Handled by auth.middleware.js
 
-        const user = userService.verifyUser(clerkId);
+// ─── GET /api/user/verify ──────────────────────────────────────────────────
+export const verifyUser = async (req, res) => {
+    try {
+        const clerkId = req.clerkId; // extracted by auth.middleware.js
+
+        const user = await userService.verifyUser(clerkId);
 
         if (user) {
-            console.log('user already exists');
-
-            res.status(200).json({
+            return res.status(200).json({
                 exists: true,
+                user,
+                // Flatten for backward compat with frontend hydration
                 subscriptions: user.subscriptions,
-                history: user.history || [],
-                likedVideos: user.likedVideos || [],
-                playlists: user.playlists || []
-            });
-        } else {
-            console.log('user does not exist');
-            res.status(200).json({
-                exists: false
+                history: user.history,
+                likedVideos: user.likedVideos,
+                playlists: user.playlists,
             });
         }
+
+        return res.status(200).json({ exists: false });
     } catch (error) {
-        console.error('Error verifying user:', error);
-        res.status(500).json({ error: 'Internal server error.' });
+        console.error('[verifyUser] Error:', error);
+        return res.status(500).json({ error: 'Internal server error.' });
     }
 };
 
-export const syncUserData = (req, res) => {
+
+// ─── POST /api/user/sync ───────────────────────────────────────────────────
+export const syncUserData = async (req, res) => {
     try {
         const clerkId = req.clerkId;
         const { history, likedVideos, playlists, subscriptions } = req.body;
 
-        const updatedUser = userService.updateUserData(clerkId, { history, likedVideos, playlists, subscriptions });
+        const updatedUser = await userService.updateUserData(clerkId, {
+            history,
+            likedVideos,
+            playlists,
+            subscriptions,
+        });
 
-        if (updatedUser) {
-            // Send to n8n
-            sendDataToN8n({
-                event: 'user_sync',
-                clerkId,
-                history,
-                likedVideos,
-                playlists,
-                subscriptions,
-                timestamp: new Date().toISOString()
-            }).catch(err => console.error('Failed to send user_sync to n8n:', err.message));
-
-            res.status(200).json({ message: 'User data synced successfully', user: updatedUser });
-        } else {
-            res.status(404).json({ error: 'User not found' });
+        if (!updatedUser) {
+            return res.status(404).json({ error: 'User not found.' });
         }
 
+        // Fire-and-forget
+        sendDataToN8n({
+            event: 'user_sync',
+            clerkId,
+            history,
+            likedVideos,
+            playlists,
+            subscriptions,
+            timestamp: new Date().toISOString(),
+        }).catch((err) => console.error('[n8n] user_sync event failed:', err.message));
+
+        return res.status(200).json({ message: 'User data synced successfully', user: updatedUser });
     } catch (error) {
-        console.error('Error syncing user data:', error);
-        res.status(500).json({ error: 'Internal server error.' });
+        console.error('[syncUserData] Error:', error);
+        return res.status(500).json({ error: 'Internal server error.' });
     }
 };

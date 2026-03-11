@@ -49,6 +49,14 @@ export function SubscriptionsPage() {
             queryClient.invalidateQueries({ queryKey: ['subscription_feed'] })
             queryClient.invalidateQueries({ queryKey: ['subscription_videos'] })
             queryClient.invalidateQueries({ queryKey: ['home_feed'] })
+        },
+        onSettled: async () => {
+            // Refetch to ensure UI updates immediately
+            await Promise.all([
+                queryClient.refetchQueries({ queryKey: ['subscription_feed'] }),
+                queryClient.refetchQueries({ queryKey: ['subscriptions'] }),
+                queryClient.refetchQueries({ queryKey: ['subscription_videos'] })
+            ])
         }
     })
 

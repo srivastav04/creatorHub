@@ -72,6 +72,8 @@ export const getRelated = async (req, res) => {
 export const getSubscriptionVideos = async (req, res) => {
     try {
         const { channelIds, pageToken } = req.query;
+        console.log(channelIds);
+
         if (!channelIds) {
             return res.status(400).json({ message: 'channelIds query parameter is required' });
         }
@@ -100,3 +102,15 @@ export const getChannels = async (req, res) => {
     }
 };
 
+export const scrapeChannel = async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q) {
+            return res.status(400).json({ message: 'Query parameter "q" is required' });
+        }
+        const data = await youtubeService.scrapeChannelFromSearch(q);
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
